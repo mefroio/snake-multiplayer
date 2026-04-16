@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Snake Evolution - Multiplayer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        body { display: flex; align-items: center; justify-content: center; }
+
+        .screen { display: none; width: 100%; max-width: 700px; padding: 20px; }
+        .screen.active { display: block; }
+        .screen h1 { color: #ffa500; font-size: 42px; text-align: center; margin-bottom: 6px; }
+        .screen h2 { color: #aaa; font-size: 16px; text-align: center; font-weight: normal; margin-bottom: 20px; }
+
+        input[type="text"], input[type="password"] {
+            background: #222; border: 2px solid #444; color: #fff;
+            padding: 10px 14px; font-size: 16px; border-radius: 6px;
+            outline: none; width: 100%;
+        }
+        input:focus { border-color: #ffa500; }
+        input::placeholder { color: #555; }
+
+        button, .btn {
+            background: #ffa500; color: #000; border: none;
+            padding: 10px 24px; font-size: 16px; font-weight: bold;
+            border-radius: 6px; cursor: pointer; margin: 4px;
+            transition: background 0.2s; display: inline-block; text-decoration: none;
+            touch-action: manipulation;
+        }
+        button:hover { background: #ffb733; }
+        button:disabled { background: #444; color: #666; cursor: default; }
+        button.secondary { background: #333; color: #ccc; }
+        button.secondary:hover { background: #444; }
+        button.small { padding: 6px 14px; font-size: 13px; }
+        button.danger { background: #c33; color: #fff; }
+        button.danger:hover { background: #e44; }
+
+        .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+        /* === ROOM BROWSER === */
+        #browser .name-row { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+        #browser .name-row input { flex: 1; }
+        #browser .actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        #roomListContainer {
+            max-height: 50vh; overflow-y: auto; border: 1px solid #333;
+            border-radius: 8px; background: #0a0a0a;
+        }
+        .room-card {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px; border-bottom: 1px solid #1a1a1a;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .room-card:hover { background: #1a1a1a; }
+        .room-card:last-child { border-bottom: none; }
+        .room-card .rc-name { flex: 1; font-weight: bold; font-size: 15px; }
+        .room-card .rc-lock { color: #ffa500; font-size: 13px; }
+        .room-card .rc-players { color: #aaa; font-size: 13px; white-space: nowrap; }
+        .room-card .rc-status {
+            font-size: 11px; padding: 3px 8px; border-radius: 4px;
+            font-weight: bold; text-transform: uppercase;
+        }
+        .rc-status.waiting { background: #1a3a1a; color: #4c4; }
+        .rc-status.playing { background: #3a2a1a; color: #fa3; }
+        .rc-status.finished { background: #3a1a1a; color: #c44; }
+        .room-empty { text-align: center; color: #555; padding: 30px; font-size: 14px; }
+
+        /* === CREATE ROOM MODAL === */
+        #createModal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            z-index: 100; align-items: center; justify-content: center;
+        }
+        #createModal.active { display: flex; }
+        #createModal .modal-box {
+            background: #111; border: 1px solid #333; border-radius: 12px;
+            padding: 24px; width: 90%; max-width: 400px;
+        }
+        #createModal h3 { color: #ffa500; font-size: 20px; margin-bottom: 16px; text-align: center; }
+        #createModal .field { margin-bottom: 12px; }
+        #createModal .field label { display: block; color: #aaa; font-size: 13px; margin-bottom: 4px; }
+        #createModal .field small { color: #666; font-size: 11px; }
+        #createModal .modal-actions { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+
+        /* === PASSWORD PROMPT === */
+        #passwordModal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            z-index: 100; align-items: center; justify-content: center;
+        }
+        #passwordModal.active { display: flex; }
+        #passwordModal .modal-box {
+            background: #111; border: 1px solid #333; border-radius: 12px;
+            padding: 24px; width: 90%; max-width: 350px; text-align: center;
+        }
+        #passwordModal h3 { color: #ffa500; font-size: 18px; margin-bottom: 14px; }
+        #passwordModal .modal-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+        #pwError { color: #f44; font-size: 13px; margin-top: 6px; min-height: 18px; }
+
+        /* === ROOM LOBBY === */
+        #lobby { text-align: center; }
+        #lobby .room-title { color: #ffa500; font-size: 22px; margin-bottom: 4px; }
+        #lobby .room-sub { color: #666; font-size: 13px; margin-bottom: 16px; }
+        #playerList { list-style: none; margin: 16px auto; max-width: 300px; }
+        #playerList li {
+            margin: 6px 0; display: flex; align-items: center;
+            justify-content: center; gap: 8px; font-size: 16px;
+        }
+        #spectatorInfo { color: #888; font-size: 13px; margin: 8px 0; }
+        .lobby-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
+
+        /* === GAME AREA === */
+        #gameArea { display: none; width: 100%; height: 100%; max-width: none; padding: 0; }
+        #gameLayout { display: flex; flex-direction: column; width: 100%; height: 100%; position: relative; }
+        #topBar {
+            display: flex; justify-content: center; align-items: center;
+            gap: 20px; padding: 4px 12px; background: #111;
+            border-bottom: 1px solid #333; font-size: 14px; flex-shrink: 0;
+        }
+        #topBar .top-level { color: #ffa500; font-weight: bold; }
+        #topBar .top-high { color: #aaa; }
+        #topBar .top-spectating { color: #888; font-style: italic; font-size: 12px; }
+        #chatToggleBtn { display: none; margin-left: auto; min-height: 36px; }
+        #gameMiddle { display: flex; flex: 1; min-height: 0; position: relative; }
+        #sidePanel {
+            width: 170px; padding: 8px 10px; background: #111;
+            border-right: 1px solid #333; font-size: 12px;
+            overflow-y: auto; flex-shrink: 0;
+        }
+        #sidePanel h3 {
+            color: #ffa500; font-size: 12px; margin-bottom: 8px;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .side-player {
+            display: flex; align-items: center; gap: 5px;
+            padding: 4px 0; border-bottom: 1px solid #1a1a1a; flex-wrap: nowrap;
+        }
+        .side-player.dead { opacity: 0.35; }
+        .side-player .sp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .side-player .sp-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+        .side-player .sp-score { font-weight: bold; font-variant-numeric: tabular-nums; font-size: 12px; }
+        .side-player .sp-lives { color: #c33; font-size: 10px; flex-shrink: 0; }
+        .side-player .sp-you {
+            color: #fff; font-size: 9px; background: #555;
+            padding: 1px 3px; border-radius: 3px; flex-shrink: 0;
+        }
+        #canvasWrap {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            min-width: 0; min-height: 0; overflow: hidden; background: #000;
+        }
+        canvas { display: block; touch-action: none; }
+        #chatPanel {
+            display: none; width: 260px; background: #0d0d0d;
+            border-left: 1px solid #333; flex-shrink: 0;
+            flex-direction: column; min-width: 0;
+            touch-action: pan-y;
+        }
+        #chatPanel.open { display: flex; }
+        #chatPanelHeader {
+            padding: 8px 10px; border-bottom: 1px solid #222;
+            color: #ffa500; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+        }
+        #chatLog {
+            flex: 1; overflow-y: auto; padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 8px; min-height: 0;
+            overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+        }
+        .chat-empty { color: #666; font-size: 12px; text-align: center; margin-top: 18px; }
+        .chat-msg {
+            background: #151515; border: 1px solid #222; border-radius: 8px;
+            padding: 8px 9px; font-size: 12px;
+        }
+        .chat-msg.dead { border-color: #2c2c2c; }
+        .chat-msg.spectator { border-color: #1a2a3a; }
+        .chat-meta {
+            display: flex; gap: 8px; align-items: center;
+            font-size: 11px; color: #888; margin-bottom: 4px;
+        }
+        .chat-role { text-transform: uppercase; font-size: 10px; color: #666; }
+        .chat-text { color: #ddd; line-height: 1.35; word-break: break-word; }
+        #chatForm {
+            display: flex; gap: 6px; padding: 8px 10px 0;
+            border-top: 1px solid #222;
+        }
+        #chatInput {
+            flex: 1; min-width: 0; padding: 8px 10px; font-size: 13px;
+            touch-action: manipulation;
+        }
+        #chatSendBtn {
+            padding: 8px 12px; font-size: 13px; margin: 0;
+            flex-shrink: 0;
+        }
+        #chatHint {
+            min-height: 18px; padding: 6px 10px 8px;
+            color: #777; font-size: 11px;
+        }
+        #spectatorBanner {
+            display: none; text-align: center; padding: 4px;
+            background: #1a1a2a; color: #88f; font-size: 13px; flex-shrink: 0;
+        }
+
+        /* === GAME OVER === */
+        #gameOver { text-align: center; }
+        #gameOver h1 { color: #ff0000; }
+        #scoreboard { margin: 15px 0; font-size: 16px; }
+        #scoreboard div {
+            margin: 5px 0; display: flex; align-items: center;
+            justify-content: center; gap: 8px;
+        }
+        .go-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+
+        /* === MOBILE === */
+        @media (max-width: 1024px) {
+            .screen h1 { font-size: 30px; }
+            .screen { padding: 12px; }
+            button { padding: 9px 18px; font-size: 14px; }
+            #gameMiddle { flex-direction: column; }
+            #gameLayout { overflow: hidden; }
+            #sidePanel {
+                width: 100%; border-right: none; border-bottom: 1px solid #333;
+                padding: 4px 8px; overflow-x: auto; overflow-y: hidden; order: -1;
+            }
+            #sidePanel h3 { display: none; }
+            #sidePlayers { display: flex; gap: 8px; flex-wrap: nowrap; }
+            .side-player {
+                border-bottom: none; padding: 2px 6px; background: #1a1a1a;
+                border-radius: 4px; flex-shrink: 0; gap: 4px;
+            }
+            .side-player .sp-name { max-width: 60px; font-size: 11px; }
+            .side-player .sp-score { font-size: 11px; }
+            .side-player .sp-lives { font-size: 9px; }
+            #topBar {
+                font-size: 12px; gap: 10px; padding: 6px 60px 6px 8px;
+                justify-content: flex-start; flex-wrap: wrap; position: relative;
+            }
+            #chatToggleBtn {
+                position: absolute; top: 6px; right: 8px;
+                margin-left: 0; min-height: 42px; padding: 8px 14px;
+                z-index: 16;
+            }
+            #chatPanel {
+                position: absolute; left: 8px; right: 8px; bottom: 8px;
+                width: auto; max-height: min(40dvh, 320px);
+                border: 1px solid #333; border-radius: 12px;
+                background: rgba(13, 13, 13, 0.96);
+                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+                backdrop-filter: blur(6px);
+                z-index: 15;
+            }
+            #chatPanelHeader {
+                padding: 10px 12px;
+            }
+            #chatForm {
+                padding: 10px 12px 0;
+            }
+            #chatInput {
+                font-size: 16px;
+                min-height: 42px;
+            }
+            #chatSendBtn {
+                min-height: 42px;
+                padding: 8px 16px;
+            }
+            #chatHint {
+                padding: 6px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+            }
+            #chatLog {
+                padding: 10px 12px;
+            }
+            #gameArea.compact-chat-open #sidePanel,
+            #gameArea.compact-chat-open #canvasWrap {
+                display: none;
+            }
+            #gameArea.compact-chat-open #gameMiddle {
+                display: block;
+            }
+            #gameArea.compact-chat-open #chatPanel {
+                display: flex;
+                position: static;
+                width: 100%;
+                max-height: none;
+                height: 100%;
+                border-left: none;
+                border-right: none;
+                border-bottom: none;
+                border-top: 1px solid #333;
+                border-radius: 0;
+                box-shadow: none;
+                background: #0d0d0d;
+                backdrop-filter: none;
+            }
+        }
+        @media (max-width: 480px) {
+            .screen h1 { font-size: 24px; }
+            button { padding: 8px 14px; font-size: 13px; }
+            .room-card { padding: 10px; gap: 8px; }
+            #topBar {
+                gap: 8px;
+                padding: 6px 56px 6px 8px;
+            }
+            #topBar .top-level,
+            #topBar .top-high,
+            #topBar .top-spectating {
+                font-size: 11px;
+            }
+            #chatToggleBtn {
+                top: 6px;
+                right: 6px;
+                min-height: 38px;
+                padding: 7px 12px;
+            }
+            #chatPanel {
+                left: 6px; right: 6px; bottom: 6px;
+                max-height: min(48dvh, 360px);
+            }
+            .chat-meta {
+                flex-wrap: wrap;
+                gap: 4px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====== SCREEN: ROOM BROWSER ====== -->
+<div id="browser" class="screen active">
+    <h1>Snake Evolution</h1>
+    <h2>Multiplayer - up to 10 players</h2>
+    <div class="name-row">
+        <input type="text" id="globalName" placeholder="Your name" maxlength="15" />
+    </div>
+    <div class="actions">
+        <button id="createRoomBtn">Create Room</button>
+        <button id="refreshBtn" class="secondary small">Refresh</button>
+    </div>
+    <div id="roomListContainer">
+        <div class="room-empty">No rooms yet. Create one!</div>
+    </div>
+</div>
+
+<!-- ====== MODAL: CREATE ROOM ====== -->
+<div id="createModal">
+    <div class="modal-box">
+        <h3>Create Room</h3>
+        <div class="field">
+            <label>Room Name</label>
+            <input type="text" id="newRoomName" placeholder="My Room" maxlength="20" />
+        </div>
+        <div class="field">
+            <label>Password (optional)</label>
+            <input type="password" id="newRoomPw" placeholder="Leave empty for public" maxlength="20" />
+            <small>Leave empty for a public room anyone can join</small>
+        </div>
+        <div class="modal-actions">
+            <button id="confirmCreate">Create</button>
+            <button id="cancelCreate" class="secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ====== MODAL: PASSWORD PROMPT ====== -->
+<div id="passwordModal">
+    <div class="modal-box">
+        <h3>Room is Private</h3>
+        <input type="password" id="roomPwInput" placeholder="Enter password" maxlength="20" />
+        <div id="pwError"></div>
+        <div class="modal-actions">
+            <button id="confirmPw">Join</button>
+            <button id="cancelPw" class="secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ====== SCREEN: ROOM LOBBY ====== -->
+<div id="lobby" class="screen">
+    <div class="room-title" id="lobbyRoomName">Room</div>
+    <div class="room-sub" id="lobbyRoomId"></div>
+    <ul id="playerList"></ul>
+    <div id="spectatorInfo"></div>
+    <div id="ownerControls" class="lobby-actions" style="display:none;">
+        <button id="addBotBtn" class="small">+ Bot</button>
+        <button id="removeBotBtn" class="small">- Bot</button>
+        <button id="startBtn">Start Game!</button>
+    </div>
+    <div class="lobby-actions">
+        <button id="joinFromSpecBtn" style="display:none;">Join as Player</button>
+    </div>
+    <div class="lobby-actions">
+        <button id="leaveRoomBtn" class="secondary small">Leave Room</button>
+    </div>
+</div>
+
+<!-- ====== SCREEN: GAME ====== -->
+<div id="gameArea" class="screen">
+    <div id="gameLayout">
+        <div id="topBar">
+            <span class="top-level" id="hudLevel">Level: 1</span>
+            <span class="top-high" id="hudHigh">High Score: 0</span>
+            <span class="top-spectating" id="hudSpectating" style="display:none">SPECTATING</span>
+            <button id="chatToggleBtn" class="secondary small" type="button">Chat</button>
+        </div>
+        <div id="spectatorBanner">You are spectating. Wait for the next round to join.</div>
+        <div id="gameMiddle">
+            <div id="sidePanel">
+                <h3>Players</h3>
+                <div id="sidePlayers"></div>
+            </div>
+            <div id="canvasWrap">
+                <canvas id="gameCanvas"></canvas>
+            </div>
+            <div id="chatPanel">
+                <div id="chatPanelHeader">Afterlife Chat</div>
+                <div id="chatLog">
+                    <div class="chat-empty">Available to spectators and eliminated players.</div>
+                </div>
+                <form id="chatForm">
+                    <input type="text" id="chatInput" maxlength="180" placeholder="Type a message" />
+                    <button id="chatSendBtn" type="submit">Send</button>
+                </form>
+                <div id="chatHint"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== SCREEN: GAME OVER ====== -->
+<div id="gameOver" class="screen">
+    <h1>Game Over!</h1>
+    <h2 id="winnerText" style="color:#ffa500; margin:10px 0;"></h2>
+    <div id="scoreboard"></div>
+    <div class="go-actions">
+        <button id="restartBtn">Play Again</button>
+        <button id="backToBrowserBtn" class="secondary">Leave Room</button>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// === State ===
+const socket = io();
+let myId = null, myColor = null, myName = null;
+let gameActive = false, isSpectator = false, isOwner = false;
+let pendingAction = null; // { action, roomId }
+let disconnectNotice = "";
+let amDead = false, chatOpen = false, chatUnreadCount = 0;
+let roomChatMessages = [], chatStatusTimer = null;
+
+// === DOM ===
+const screens = {
+    browser: document.getElementById("browser"),
+    lobby: document.getElementById("lobby"),
+    gameArea: document.getElementById("gameArea"),
+    gameOver: document.getElementById("gameOver")
+};
+const $ = id => document.getElementById(id);
+const canvas = $("gameCanvas");
+const ctx = canvas.getContext("2d");
+const GAME_W = 800, GAME_H = 600, BLOCK_SIZE = 10;
+const compactLayoutQuery = window.matchMedia("(max-width: 1024px)");
+canvas.width = GAME_W; canvas.height = GAME_H;
+
+function showScreen(name) {
+    for (const [k, el] of Object.entries(screens)) {
+        el.classList.toggle("active", k === name);
+        if (k === "gameArea") el.style.display = k === name ? "block" : "none";
+    }
+}
+
+function canUseRoomChat() {
+    return gameActive && (isSpectator || amDead);
+}
+
+function isCompactLayout() {
+    return compactLayoutQuery.matches;
+}
+
+function isEditableElement(target) {
+    if (!target || typeof target.closest !== "function") return false;
+    return !!target.closest("input, textarea, [contenteditable='true']");
+}
+
+function isChatUiTarget(target) {
+    if (!target || typeof target.closest !== "function") return false;
+    return !!target.closest("#chatPanel, #chatToggleBtn");
+}
+
+function getDefaultChatHint() {
+    if (isSpectator) return "Chat with eliminated players and spectators.";
+    if (amDead) return "You were eliminated. Chat with spectators and other eliminated players.";
+    return "";
+}
+
+function updateChatToggleLabel() {
+    if (chatOpen && isCompactLayout()) {
+        $("chatToggleBtn").textContent = "Close Chat";
+        return;
+    }
+    $("chatToggleBtn").textContent = chatUnreadCount > 0 ? `Chat (${chatUnreadCount})` : "Chat";
+}
+
+function scrollChatToBottom() {
+    const log = $("chatLog");
+    log.scrollTop = log.scrollHeight;
+}
+
+function renderChat() {
+    const log = $("chatLog");
+    if (roomChatMessages.length === 0) {
+        log.innerHTML = '<div class="chat-empty">No messages yet.</div>';
+        return;
+    }
+
+    log.innerHTML = "";
+    roomChatMessages.forEach(msg => {
+        const item = document.createElement("div");
+        item.className = `chat-msg ${msg.role || "spectator"}`;
+        const time = new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        item.innerHTML =
+            `<div class="chat-meta">` +
+            `<span style="color:${msg.senderColor || "#88f"}">${esc(msg.senderName || "Player")}</span>` +
+            `<span class="chat-role">${msg.role === "dead" ? "dead" : "spectator"}</span>` +
+            `<span>${time}</span>` +
+            `</div>` +
+            `<div class="chat-text">${esc(msg.text || "")}</div>`;
+        log.appendChild(item);
+    });
+
+    if (chatOpen) scrollChatToBottom();
+}
+
+function setChatStatus(message, isError = false) {
+    const hint = $("chatHint");
+    if (chatStatusTimer) {
+        clearTimeout(chatStatusTimer);
+        chatStatusTimer = null;
+    }
+
+    hint.textContent = message || getDefaultChatHint();
+    hint.style.color = isError ? "#f66" : "#777";
+
+    if (message && isError) {
+        chatStatusTimer = setTimeout(() => {
+            hint.textContent = getDefaultChatHint();
+            hint.style.color = "#777";
+            chatStatusTimer = null;
+        }, 3000);
+    }
+}
+
+function updateChatVisibility() {
+    const available = canUseRoomChat();
+    $("chatToggleBtn").style.display = available ? "inline-flex" : "none";
+    $("chatPanel").classList.toggle("open", available && chatOpen);
+    screens.gameArea.classList.toggle("compact-chat-open", available && chatOpen && isCompactLayout());
+    $("chatInput").disabled = !available;
+    $("chatSendBtn").disabled = !available;
+
+    if (!available) {
+        chatOpen = false;
+        chatUnreadCount = 0;
+    }
+
+    updateChatToggleLabel();
+    setChatStatus("", false);
+}
+
+function resetChatState() {
+    amDead = false;
+    chatOpen = false;
+    chatUnreadCount = 0;
+    roomChatMessages = [];
+    renderChat();
+    updateChatVisibility();
+}
+
+// === Canvas resize ===
+function resizeCanvas() {
+    const wrap = $("canvasWrap");
+    if (!wrap) return;
+    const ww = wrap.clientWidth, wh = wrap.clientHeight;
+    if (ww === 0 || wh === 0) return;
+    const scale = Math.min(ww / GAME_W, wh / GAME_H);
+    canvas.style.width = Math.floor(GAME_W * scale) + "px";
+    canvas.style.height = Math.floor(GAME_H * scale) + "px";
+}
+window.addEventListener("resize", resizeCanvas);
+window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 200));
+
+// === Drawing ===
+function drawRect(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); }
+function drawText(text, font, color, x, y) {
+    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "center"; ctx.fillText(text, x, y);
+}
+function drawBoundary() { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(0, 0, GAME_W, GAME_H); }
+
+// =============================================
+// ROOM BROWSER
+// =============================================
+socket.on("roomList", (list) => {
+    const container = $("roomListContainer");
+    if (list.length === 0) {
+        container.innerHTML = '<div class="room-empty">No rooms yet. Create one!</div>';
+        return;
+    }
+    container.innerHTML = "";
+    list.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "room-card";
+        const statusClass = r.finished ? "finished" : r.started ? "playing" : "waiting";
+        const statusLabel = r.finished ? "Finished" : r.started ? "Playing" : "Waiting";
+        const lock = r.hasPassword ? '<span class="rc-lock">&#128274;</span>' : "";
+        const specs = r.spectatorCount > 0 ? ` + ${r.spectatorCount} watching` : "";
+        div.innerHTML =
+            `<span class="rc-name">${esc(r.name)}</span>` +
+            lock +
+            `<span class="rc-players">${r.playerCount}/${r.maxPlayers}${specs}</span>` +
+            `<span class="rc-status ${statusClass}">${statusLabel}</span>`;
+
+        div.addEventListener("click", () => onRoomClick(r));
+        container.appendChild(div);
+    });
+});
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function onRoomClick(room) {
+    const name = $("globalName").value.trim() || "Player";
+    // Decide action: join as player if waiting & has slots, else spectate
+    const canPlay = !room.started && !room.finished && room.playerCount < room.maxPlayers;
+    const action = canPlay ? "join" : "spectate";
+
+    if (room.hasPassword) {
+        pendingAction = { action, roomId: room.id, playerName: name };
+        $("pwError").textContent = "";
+        $("roomPwInput").value = "";
+        $("passwordModal").classList.add("active");
+        $("roomPwInput").focus();
+        return;
+    }
+    if (action === "join") {
+        socket.emit("joinRoom", { roomId: room.id, playerName: name });
+    } else {
+        socket.emit("spectateRoom", { roomId: room.id, playerName: name });
+    }
+}
+
+$("refreshBtn").addEventListener("click", () => socket.emit("getRooms"));
+
+// Create room modal
+$("createRoomBtn").addEventListener("click", () => {
+    $("newRoomName").value = "";
+    $("newRoomPw").value = "";
+    $("createModal").classList.add("active");
+    $("newRoomName").focus();
+});
+$("cancelCreate").addEventListener("click", () => $("createModal").classList.remove("active"));
+$("confirmCreate").addEventListener("click", () => {
+    const playerName = $("globalName").value.trim() || "Player";
+    const roomName = $("newRoomName").value.trim() || "New Room";
+    const password = $("newRoomPw").value.trim();
+    socket.emit("createRoom", { playerName, roomName, password });
+    $("createModal").classList.remove("active");
+});
+$("newRoomName").addEventListener("keydown", e => { if (e.key === "Enter") $("confirmCreate").click(); });
+$("newRoomPw").addEventListener("keydown", e => { if (e.key === "Enter") $("confirmCreate").click(); });
+
+// Password modal
+$("cancelPw").addEventListener("click", () => { $("passwordModal").classList.remove("active"); pendingAction = null; });
+$("confirmPw").addEventListener("click", submitPassword);
+$("roomPwInput").addEventListener("keydown", e => { if (e.key === "Enter") submitPassword(); });
+
+function submitPassword() {
+    if (!pendingAction) return;
+    const pw = $("roomPwInput").value;
+    const data = { roomId: pendingAction.roomId, playerName: pendingAction.playerName, password: pw };
+    if (pendingAction.action === "join") {
+        socket.emit("joinRoom", data);
+    } else {
+        socket.emit("spectateRoom", data);
+    }
+}
+
+socket.on("joinError", (msg) => {
+    if ($("passwordModal").classList.contains("active")) {
+        $("pwError").textContent = msg;
+    } else {
+        alert(msg);
+    }
+});
+
+// =============================================
+// JOINED ROOM -> LOBBY
+// =============================================
+socket.on("joined", (data) => {
+    myId = data.playerId;
+    myColor = data.color;
+    myName = data.name;
+    isSpectator = data.isSpectator;
+    isOwner = data.isOwner || false;
+    resetChatState();
+
+    $("passwordModal").classList.remove("active");
+    pendingAction = null;
+
+    if (data.gameInProgress) {
+        // Restored player/spectator or spectator joining a live game
+        showScreen("gameArea");
+        gameActive = true;
+        levelUpMsg = null; levelUpTimer = 0; lastState = null;
+        $("hudSpectating").style.display = isSpectator ? "" : "none";
+        $("spectatorBanner").style.display = isSpectator ? "" : "none";
+        updateChatVisibility();
+        requestAnimationFrame(() => requestAnimationFrame(resizeCanvas));
+    } else {
+        showScreen("lobby");
+        $("lobbyRoomId").textContent = data.roomId;
+        updateLobbyControls();
+    }
+});
+
+socket.on("promoted", (data) => {
+    myId = data.playerId;
+    myColor = data.color;
+    myName = data.name;
+    isSpectator = false;
+    amDead = false;
+    updateLobbyControls();
+    updateChatVisibility();
+});
+
+function updateLobbyControls() {
+    $("ownerControls").style.display = isOwner ? "flex" : "none";
+    $("joinFromSpecBtn").style.display = isSpectator && !isOwner ? "" : "none";
+}
+
+socket.on("lobby", (data) => {
+    $("lobbyRoomName").textContent = data.roomName || "Room";
+    $("lobbyRoomId").textContent = (data.hasPassword ? "&#128274; " : "") + "ID: " + data.roomId;
+
+    // Update owner status from lobby data
+    if (data.ownerId) isOwner = (data.ownerId === myId);
+    updateLobbyControls();
+
+    const list = $("playerList");
+    list.innerHTML = "";
+    data.players.forEach(p => {
+        const li = document.createElement("li");
+        const ownerTag = (data.ownerId === p.id) ? " &#9733;" : "";
+        const youTag = p.id === myId ? " (you)" : "";
+        const botTag = p.isBot ? " [BOT]" : "";
+        li.innerHTML = `<span class="color-dot" style="background:${p.color}"></span> ${esc(p.name)}${botTag}${ownerTag}${youTag}`;
+        list.appendChild(li);
+    });
+    $("spectatorInfo").textContent = data.spectatorCount > 0 ? `${data.spectatorCount} spectator(s) watching` : "";
+});
+
+// Lobby buttons
+$("addBotBtn").addEventListener("click", () => socket.emit("addBot"));
+$("removeBotBtn").addEventListener("click", () => socket.emit("removeBot"));
+$("startBtn").addEventListener("click", () => { socket.emit("startGame"); $("startBtn").disabled = true; });
+$("joinFromSpecBtn").addEventListener("click", () => socket.emit("joinFromSpectator"));
+$("leaveRoomBtn").addEventListener("click", () => socket.emit("leaveRoom"));
+
+socket.on("leftRoom", () => {
+    showScreen("browser");
+    isSpectator = false; isOwner = false;
+    myId = null;
+    $("startBtn").disabled = false;
+    resetChatState();
+});
+
+// Chat controls
+$("chatToggleBtn").addEventListener("click", () => {
+    if (!canUseRoomChat()) return;
+    chatOpen = !chatOpen;
+    if (chatOpen) {
+        chatUnreadCount = 0;
+        updateChatToggleLabel();
+        renderChat();
+        requestAnimationFrame(scrollChatToBottom);
+        if (isCompactLayout()) {
+            requestAnimationFrame(() => $("chatInput").focus());
+        }
+    }
+    updateChatVisibility();
+});
+
+$("chatForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!canUseRoomChat()) return;
+    const input = $("chatInput");
+    const text = input.value.trim();
+    if (!text) return;
+    socket.emit("sendRoomChat", { text });
+    input.value = "";
+});
+
+socket.on("roomChatHistory", (messages) => {
+    roomChatMessages = Array.isArray(messages) ? messages : [];
+    if (!chatOpen && canUseRoomChat()) {
+        chatUnreadCount = roomChatMessages.length;
+    }
+    renderChat();
+    updateChatVisibility();
+});
+
+socket.on("roomChatMessage", (message) => {
+    roomChatMessages.push(message);
+    if (roomChatMessages.length > 60) {
+        roomChatMessages.shift();
+    }
+    if (!chatOpen && canUseRoomChat()) {
+        chatUnreadCount++;
+    }
+    renderChat();
+    updateChatToggleLabel();
+});
+
+socket.on("roomChatError", (msg) => {
+    setChatStatus(msg, true);
+});
+
+// =============================================
+// GAME
+// =============================================
+let lastState = null, levelUpMsg = null, levelUpTimer = 0;
+
+socket.on("gameStarted", () => {
+    showScreen("gameArea");
+    gameActive = true;
+    amDead = false;
+    roomChatMessages = [];
+    chatUnreadCount = 0;
+    levelUpMsg = null; levelUpTimer = 0; lastState = null;
+    $("hudSpectating").style.display = isSpectator ? "" : "none";
+    $("spectatorBanner").style.display = isSpectator ? "" : "none";
+    renderChat();
+    updateChatVisibility();
+    requestAnimationFrame(() => requestAnimationFrame(resizeCanvas));
+});
+
+["click", "touchstart", "touchmove", "touchend", "pointerdown"].forEach((eventName) => {
+    $("chatPanel").addEventListener(eventName, (e) => e.stopPropagation(), { passive: false });
+    $("chatToggleBtn").addEventListener(eventName, (e) => e.stopPropagation(), { passive: false });
+});
+
+$("chatInput").addEventListener("keydown", (e) => e.stopPropagation());
+
+// Input
+document.addEventListener("keydown", (e) => {
+    if (!gameActive || isSpectator || amDead) return;
+    if (isEditableElement(e.target) || isChatUiTarget(document.activeElement)) return;
+    const map = { ArrowUp:"UP", ArrowDown:"DOWN", ArrowLeft:"LEFT", ArrowRight:"RIGHT", KeyW:"UP", KeyS:"DOWN", KeyA:"LEFT", KeyD:"RIGHT" };
+    const dir = map[e.code];
+    if (dir) { e.preventDefault(); socket.emit("direction", dir); }
+});
+let touchStartX = 0, touchStartY = 0;
+document.addEventListener("touchstart", (e) => {
+    if (!gameActive || isSpectator || amDead) return;
+    if (isEditableElement(e.target) || isChatUiTarget(e.target)) return;
+    touchStartX = e.changedTouches[0].pageX; touchStartY = e.changedTouches[0].pageY;
+}, { passive: true });
+document.addEventListener("touchend", (e) => {
+    if (!gameActive || isSpectator || amDead) return;
+    if (isEditableElement(e.target) || isChatUiTarget(e.target)) return;
+    const dx = e.changedTouches[0].pageX - touchStartX;
+    const dy = e.changedTouches[0].pageY - touchStartY;
+    if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return;
+    socket.emit("direction", Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "RIGHT" : "LEFT") : (dy > 0 ? "DOWN" : "UP"));
+}, { passive: true });
+
+// Render
+socket.on("gameState", (state) => {
+    lastState = state;
+    if (!isSpectator && myId) {
+        const me = state.players.find(p => p.id === myId);
+        amDead = !!(me && !me.alive);
+    }
+    render(state);
+    updateChatVisibility();
+});
+socket.on("levelUp", (level) => { levelUpMsg = "LEVEL " + level + "!"; levelUpTimer = 60; });
+
+function render(state) {
+    $("hudLevel").textContent = "Level: " + state.level;
+    $("hudHigh").textContent = "High: " + state.highScore + " (" + state.highScorePlayer + ")";
+
+    const sorted = [...state.players].sort((a, b) => b.score - a.score);
+    const sp = $("sidePlayers");
+    sp.innerHTML = "";
+    sorted.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "side-player" + (p.alive ? "" : " dead");
+        const bot = p.isBot ? " [BOT]" : "";
+        const youTag = p.id === myId ? `<span class="sp-you">YOU</span>` : "";
+        const hearts = p.alive ? "&#9829;".repeat(p.lives) : "&#10006;";
+        div.innerHTML =
+            `<span class="sp-dot" style="background:${p.color}"></span>` +
+            `<span class="sp-name" style="color:${p.color}">${esc(p.name)}${bot}</span>` +
+            youTag +
+            `<span class="sp-score" style="color:${p.color}">${p.score}</span>` +
+            `<span class="sp-lives">${hearts}</span>`;
+        sp.appendChild(div);
+    });
+
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, GAME_W, GAME_H);
+    state.obstacles.forEach(o => drawRect(o.x, o.y, BLOCK_SIZE, BLOCK_SIZE, "#0000ff"));
+    state.deadFood.forEach(f => drawRect(f.x, f.y, BLOCK_SIZE, BLOCK_SIZE, "#ff0000"));
+    if (state.activeFood) {
+        drawRect(state.activeFood.x, state.activeFood.y, BLOCK_SIZE, BLOCK_SIZE, "#ff0000");
+        const pulse = Math.sin(Date.now() / 200) * 2;
+        ctx.strokeStyle = "#ff4444"; ctx.lineWidth = 1;
+        ctx.strokeRect(state.activeFood.x - pulse, state.activeFood.y - pulse, BLOCK_SIZE + pulse * 2, BLOCK_SIZE + pulse * 2);
+    }
+    state.players.forEach(p => {
+        if (!p.alive) return;
+        p.body.forEach((seg, i) => {
+            if (i === 0) {
+                drawRect(seg.x, seg.y, BLOCK_SIZE, BLOCK_SIZE, "#fff");
+                drawRect(seg.x + 1, seg.y + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2, p.color);
+            } else {
+                drawRect(seg.x, seg.y, BLOCK_SIZE, BLOCK_SIZE, p.color);
+            }
+        });
+    });
+    drawBoundary();
+    if (levelUpTimer > 0) { drawText(levelUpMsg, "30px Arial", "#ffa500", GAME_W / 2, GAME_H / 2); levelUpTimer--; }
+}
+
+// =============================================
+// GAME OVER
+// =============================================
+socket.on("youDied", () => {
+    amDead = true;
+    updateChatVisibility();
+});
+
+socket.on("gameOver", (data) => {
+    gameActive = false;
+    updateChatVisibility();
+    showScreen("gameOver");
+
+    const wt = $("winnerText");
+    if (data.winner) { wt.textContent = data.winner + " wins!"; wt.style.color = data.winnerColor || "#ffa500"; }
+    else { wt.textContent = "No survivors!"; wt.style.color = "#f00"; }
+
+    const sb = $("scoreboard");
+    sb.innerHTML = "";
+    if (lastState) {
+        [...lastState.players].sort((a, b) => b.score - a.score).forEach((p, i) => {
+            const div = document.createElement("div");
+            const medal = i === 0 ? "1st" : i === 1 ? "2nd" : i === 2 ? "3rd" : `${i + 1}th`;
+            const alive = p.alive ? " - WINNER" : "";
+            const bot = p.isBot ? " [BOT]" : "";
+            div.innerHTML = `<span class="color-dot" style="background:${p.color}"></span> ${medal} ${esc(p.name)}${bot}: ${p.score} pts${alive}`;
+            div.style.color = p.color;
+            sb.appendChild(div);
+        });
+    }
+
+    // Only owner can restart
+    $("restartBtn").style.display = isOwner ? "" : "none";
+});
+
+$("restartBtn").addEventListener("click", () => socket.emit("requestRestart"));
+$("backToBrowserBtn").addEventListener("click", () => socket.emit("leaveRoom"));
+
+socket.on("restarted", () => {
+    showScreen("lobby");
+    gameActive = false;
+    $("startBtn").disabled = false;
+    resetChatState();
+    updateLobbyControls();
+});
+
+socket.on("sessionTakenOver", () => {
+    disconnectNotice = "This session was opened in another tab or window.";
+});
+
+// =============================================
+// DISCONNECT
+// =============================================
+socket.on("disconnect", () => {
+    gameActive = false; isSpectator = false; isOwner = false; myId = null;
+    resetChatState();
+    showScreen("browser");
+    if (disconnectNotice) {
+        const msg = disconnectNotice;
+        disconnectNotice = "";
+        alert(msg);
+    }
+});
+</script>
+</body>
+</html>
